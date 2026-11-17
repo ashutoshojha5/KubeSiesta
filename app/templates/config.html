@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block body %}
+<body>
+<header>
+  <h1>KubeSiesta · {{ settings.cluster_name }} · configuration</h1>
+  <a href="/">← Back to dashboard</a>
+</header>
+<main>
+  {% if settings.config_url %}
+  <div class="banner" style="color:var(--accent);border-color:var(--accent)">
+    To change any of these settings, edit the ConfigMap in git:
+    <a href="{{ settings.config_url }}" target="_blank" rel="noopener">{{ settings.config_url }}</a>,
+    apply it, and restart the kube-siesta pod.
+  </div>
+  {% endif %}
+  <section>
+    <h2>Right now</h2>
+    <table>
+      <tr><td>Time ({{ settings.timezone }})</td><td>{{ now.strftime('%a %Y-%m-%d %H:%M') }}</td></tr>
+      <tr><td>Off hours</td><td>{% if window %}<span class="pill partial">on</span>
+        until {{ window[1].strftime('%a %H:%M') }}{% else %}<span class="pill awake">off</span> (working hours){% endif %}</td></tr>
+      {% if next_window %}<tr><td>Next off window</td><td>{{ next_window[0].strftime('%a %Y-%m-%d %H:%M') }} → {{ next_window[1].strftime('%a %Y-%m-%d %H:%M') }}</td></tr>{% endif %}
+    </table>
+  </section>
+  {% for title, rows in sections %}
+  <section>
+    <h2>{{ title }}</h2>
+    <table>
+      {% for env, value, help in rows %}
+      <tr>
+        <td>{{ env }}</td>
+        <td><code>{{ value }}</code></td>
+        <td style="width:1%"><button type="button" class="info" aria-expanded="false"
+              aria-label="About {{ env }}" title="About this setting">i</button></td>
+      </tr>
+      <tr class="detail" hidden><td colspan="3">{{ help }}</td></tr>
+      {% endfor %}
+    </table>
+  </section>
+  {% endfor %}
+  <p class="muted">Read-only. Settings come from the kube-siesta-config ConfigMap; change it and restart the pod. JSON: <a href="/api/config">/api/config</a>.</p>
+</main>
+<script>
+  document.querySelectorAll("button.info").forEach(btn => btn.addEventListener("click", () => {
+    const row = btn.closest("tr").nextElementSibling;
+    row.hidden = !row.hidden;
+    btn.setAttribute("aria-expanded", String(!row.hidden));
+  }));
+</script>
+</body>
+{% endblock %}

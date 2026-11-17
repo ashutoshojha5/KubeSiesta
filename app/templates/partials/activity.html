@@ -1,0 +1,17 @@
+{% if operations %}
+<table>
+  <tr><th>In progress / recent</th><th>Status</th><th></th></tr>
+  {% for op in operations %}
+  <tr><td>{{ op.description }}</td><td class="{{ op.status }}">{{ op.status }}</td><td class="failed">{{ op.error }}</td></tr>
+  {% endfor %}
+</table>
+<br>
+{% endif %}
+<table>
+  <tr><th>When</th><th>Who</th><th>Action</th><th>Target</th><th>Detail</th></tr>
+  {% for a in audit %}
+  <tr><td class="muted">{{ a.at[:16].replace('T', ' ') }}</td><td>{{ a.actor }}</td><td>{{ a.action }}</td><td>{{ a.target }}</td><td class="muted">{{ a.detail }}</td></tr>
+  {% else %}
+  <tr><td colspan="5" class="muted">No activity yet.</td></tr>
+  {% endfor %}
+</table>

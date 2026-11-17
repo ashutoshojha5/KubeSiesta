@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "kube-siesta.fullname" . }}
+  labels:
+    {{- include "kube-siesta.labels" . | nindent 4 }}
+spec:
+  # Single replica: it is the only writer of the state file and runs the off-hours schedule
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "kube-siesta.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "kube-siesta.selectorLabels" . | nindent 8 }}
+        {{- if eq .Values.provider "aks" }}
+        azure.workload.identity/use: "true"
+        {{- end }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        # Settings are read at startup: restart the pod when they change
+        checksum/config: {{ include "kube-siesta.configData" . | sha256sum }}
+    spec:
+      serviceAccountName: {{ include "kube-siesta.fullname" . }}
+      {{- $cloud := include "kube-siesta.cloud" . | fromYaml }}
+      {{- with .Values.nodeSelector | default $cloud.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations | default $cloud.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001  # lets the app write to the state volume
+      containers:
+        - name: kube-siesta
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: {{ include "kube-siesta.fullname" . }}-config
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "kube-siesta.fullname" . }}-data

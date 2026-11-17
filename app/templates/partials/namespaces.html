@@ -1,0 +1,47 @@
+<table>
+  <tr><th>Namespace</th><th>Owner</th><th>State</th><th>Running</th>{% if settings.flux_enabled %}<th>Flux</th>{% endif %}{% if settings.argocd_enabled %}<th>Argo CD</th>{% endif %}{% if settings.keda_enabled %}<th>KEDA</th>{% endif %}<th>Weekend lease</th><th></th></tr>
+  {% for ns in namespaces %}
+  <tr>
+    <td>
+      <a href="#" hx-get="/partials/namespaces/{{ ns.name }}" hx-target="#detail-{{ ns.name }}">{{ ns.name }}</a>
+      {% if ns.managed %}<span class="muted">· scheduled</span>{% endif %}
+    </td>
+    <td>
+      <form class="inline" hx-post="/namespaces/{{ ns.name }}/owner" hx-target="#flash">
+        <input type="text" name="owner" value="{{ ns.owner }}" placeholder="owner" maxlength="64" size="14" aria-label="Owner of {{ ns.name }}">
+        <button type="submit">Save</button>
+      </form>
+    </td>
+    <td><span class="pill {{ ns.state }}">{{ ns.state }}</span></td>
+    <td>{{ ns.running }} / {{ ns.workloads|length }}</td>
+    {% if settings.flux_enabled %}<td>
+      {% if not ns.flux_isolated %}<span class="partial" title="No Flux Kustomization is labelled for this namespace; Flux may revert changes">not isolated</span>
+      {% elif ns.flux|selectattr('suspended')|list %}<span class="muted">suspended</span>
+      {% else %}<span class="muted">active</span>{% endif %}
+    </td>{% endif %}
+    {% if settings.argocd_enabled %}<td>
+      {% if not ns.argocd_isolated %}<span class="partial" title="No Argo CD Application is labelled for this namespace; Argo CD may revert changes">not isolated</span>
+      {% elif ns.argocd|selectattr('paused_by_us')|selectattr('auto_sync')|list %}<span class="partial" title="Auto-sync was turned back on while the namespace sleeps, probably by a parent app or ApplicationSet; see README, Argo CD">re-enabled</span>
+      {% elif ns.argocd|rejectattr('auto_sync')|list %}<span class="muted">auto-sync off</span>
+      {% else %}<span class="muted">auto-sync</span>{% endif %}
+    </td>{% endif %}
+    {% if settings.keda_enabled %}<td class="muted">
+      {% if not ns.keda %}—{% elif ns.keda|selectattr('paused')|list %}paused{% else %}active{% endif %}
+    </td>{% endif %}
+    <td class="muted">{{ ns.lease_until[:16].replace('T', ' ') if ns.lease_until else '—' }}</td>
+    <td>
+      {% if ns.state != 'awake' %}
+      <button class="primary" hx-post="/namespaces/{{ ns.name }}/wake" hx-target="#flash">Wake</button>
+      {% endif %}
+      {% if ns.state != 'asleep' and ns.state != 'empty' %}
+      <button hx-post="/namespaces/{{ ns.name }}/sleep" hx-target="#flash"
+              hx-confirm="Scale every workload in {{ ns.name }} to 0?">Sleep</button>
+      {% endif %}
+      {% if ns.lease_until %}
+      <button hx-post="/namespaces/{{ ns.name }}/extend" hx-target="#flash">Extend</button>
+      {% endif %}
+    </td>
+  </tr>
+  <tr class="detail"><td colspan="{{ 6 + (1 if settings.flux_enabled else 0) + (1 if settings.argocd_enabled else 0) + (1 if settings.keda_enabled else 0) }}" id="detail-{{ ns.name }}" style="padding:0"></td></tr>
+  {% endfor %}
+</table>

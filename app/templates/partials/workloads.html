@@ -1,0 +1,26 @@
+<div style="padding:8px 12px">
+  {% if not ns.workloads %}<span class="muted">No Deployments or StatefulSets.</span>{% else %}
+  <table>
+    <tr><th>Kind</th><th>Name</th><th>Ready / desired</th><th>Saved replicas</th><th></th></tr>
+    {% for w in ns.workloads %}
+    <tr>
+      <td class="muted">{{ w.kind }}</td>
+      <td>{{ w.name }}</td>
+      <td><span class="{{ 'awake' if w.replicas and w.ready == w.replicas else ('partial' if w.replicas else 'asleep') }}">{{ w.ready }} / {{ w.replicas }}</span></td>
+      <td class="muted">{{ w.original_replicas if w.original_replicas is not none else '—' }}</td>
+      <td>
+        {% if not ns.protected %}
+        <form class="inline" hx-post="/namespaces/{{ ns.name }}/workloads/{{ w.kind }}/{{ w.name }}/scale" hx-target="#flash">
+          <input type="number" name="replicas" min="0" max="20"
+                 value="{{ w.replicas or w.original_replicas or 1 }}">
+          <button type="submit">Scale</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% set held = [] %}{% if settings.flux_enabled %}{% set _ = held.append('Flux') %}{% endif %}{% if settings.argocd_enabled %}{% set _ = held.append('Argo CD auto-sync') %}{% endif %}{% if settings.keda_enabled %}{% set _ = held.append('KEDA') %}{% endif %}
+  <p class="muted">Scaling a single workload{% if held %} pauses {{ held|join(' and ') }}{% endif %} for {{ ns.name }}. Use <b>Wake</b> to restore every workload{% if held %} and resume {{ held|join(' and ') }}{% endif %}.</p>
+  {% endif %}
+</div>

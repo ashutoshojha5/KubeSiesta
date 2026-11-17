@@ -1,0 +1,36 @@
+[project]
+name = "kube-siesta"
+version = "1.0.0"
+description = "Weekend scale-down and on-demand scale-up of AKS/EKS node pools and workloads"
+requires-python = ">=3.15"
+license = "MIT"
+license-files = ["LICENSE"]
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "jinja2>=3.1",
+    "python-multipart>=0.0.9",
+    "pydantic-settings>=2.4",
+    "kubernetes>=31.0",
+    "azure-identity>=1.19",
+    "azure-mgmt-containerservice>=41.0",
+    "boto3>=1.35",
+    # Timezone database for SIESTA_TIMEZONE, independent of the base image
+    "tzdata",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "httpx>=0.27"]
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.setuptools.package-data]
+app = ["templates/*.html", "templates/partials/*.html"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

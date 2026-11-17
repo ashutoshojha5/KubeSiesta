@@ -1,0 +1,7 @@
+KubeSiesta is running in {{ .Release.Namespace }} ({{ .Values.provider | upper }}, Flux: {{ .Values.flux.enabled }}, Argo CD: {{ .Values.argocd.enabled }}, KEDA: {{ .Values.keda.enabled }}).
+{{- if .Values.ingress.enabled }}
+UI: http{{ if .Values.ingress.tlsSecretName }}s{{ end }}://{{ .Values.ingress.host }} (VPN only)
+{{- else }}
+UI: kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "kube-siesta.fullname" . }} 8000:{{ .Values.service.port }}
+{{- end }}
+Live settings: /config. Keep this release at one replica.

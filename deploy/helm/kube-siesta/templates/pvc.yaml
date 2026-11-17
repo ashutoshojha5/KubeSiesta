@@ -1,0 +1,17 @@
+# Kept on uninstall so the saved node counts, leases and audit log survive a reinstall
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "kube-siesta.fullname" . }}-data
+  labels:
+    {{- include "kube-siesta.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes: ["ReadWriteOnce"]
+  {{- with .Values.persistence.storageClassName | default (include "kube-siesta.cloud" . | fromYaml).storageClassName }}
+  storageClassName: {{ . }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.size }}

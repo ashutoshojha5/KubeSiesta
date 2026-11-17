@@ -1,0 +1,25 @@
+<table>
+  <tr><th>Pool</th><th>Mode</th><th>{{ 'Instance type' if settings.provider == 'eks' else 'VM size' }}</th><th>Nodes</th><th>State</th><th>Weekend</th><th>Saved count</th><th></th></tr>
+  {% for p in pools %}
+  <tr>
+    <td>{{ p.name }}</td>
+    <td>{{ p.mode }}</td>
+    <td>{{ p.vm_size }}</td>
+    <td><span class="pill {{ 'awake' if p.count else 'asleep' }}">{{ p.count }}</span></td>
+    <td class="{{ 'running' if p.provisioning_state not in ('Succeeded', '') else 'muted' }}">{{ p.provisioning_state }}</td>
+    <td class="muted">{{ weekend[p.name] if weekend[p.name] is not none else 'not scaled' }}</td>
+    <td class="muted">{{ saved.get(p.name, '—') }}</td>
+    <td>
+      {% if p.protected %}<span class="muted">protected</span>
+      {% elif p.autoscaling %}<span class="muted">autoscaler</span>
+      {% else %}
+      <form class="inline" hx-post="/nodepools/{{ p.name }}/scale" hx-target="#flash"
+            hx-confirm="Scale node pool {{ p.name }}?{{ ' Shrinking the system pool drains nodes running cluster add-ons.' if p.is_system else '' }}">
+        <input type="number" name="count" min="{{ p.min_count }}" max="10" value="{{ p.count or saved.get(p.name, 1) }}">
+        <button type="submit">Scale</button>
+      </form>
+      {% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+</table>

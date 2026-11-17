@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block body %}
+<body>
+<div class="center">
+  <form class="card" method="post" action="/whoami">
+    <h1>What's your name?</h1>
+    <p class="muted">It's saved in this browser and recorded in the audit log with every change you make on {{ settings.cluster_name }}.</p>
+    <input type="text" name="name" value="{{ name }}" placeholder="e.g. Priya" maxlength="64"
+           required autofocus autocomplete="name" aria-label="Your name">
+    {% if error %}<div class="error">{{ error }}</div>{% endif %}
+    <button type="submit" class="primary">Continue</button>
+  </form>
+</div>
+</body>
+{% endblock %}

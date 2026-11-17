@@ -1,0 +1,141 @@
+# KubeSiesta chart values. Copy this file, pick the cloud (`provider`) and how the workloads are deployed
+# (`flux` / `argocd`, or neither for plain manifests), and replace the example values:
+#   helm upgrade --install kube-siesta deploy/helm/kube-siesta -n kube-siesta --create-namespace -f my-values.yaml
+# The same settings, for local development, are in .env.example.
+
+image:
+  # Published image (amd64 and arm64): https://hub.docker.com/r/ashutoshojha5/kubesiesta
+  # To use your own build, set e.g. example.azurecr.io/kube-siesta
+  repository: docker.io/ashutoshojha5/kubesiesta
+  # latest follows the main branch; use a release version (e.g. 0.1.0) once one is published
+  tag: latest
+  pullPolicy: Always
+
+# === Cloud ============================================================================================
+# aks | eks. Only the selected section below is used: it sets the SIESTA_* cloud settings, the workload
+# identity, where the pod runs (a pool that stays up in off hours) and the volume's storage class.
+provider: aks
+
+# --- AKS (Azure Workload Identity) --------------------------------------------------------------------
+aks:
+  subscriptionId: 00000000-0000-0000-0000-000000000000
+  resourceGroup: my-resource-group
+  clusterName: my-cluster
+  # Client ID printed by deploy/setup-azure-identity.sh
+  workloadIdentityClientId: 00000000-0000-0000-0000-000000000000
+  # Run on the system pool, which stays up while the user pools are at 0
+  nodeSelector:
+    kubernetes.azure.com/mode: system
+  tolerations:
+    - key: CriticalAddonsOnly
+      operator: Exists
+  storageClassName: managed-csi
+
+# --- EKS (IRSA) ---------------------------------------------------------------------------------------
+eks:
+  region: us-east-1
+  clusterName: my-cluster
+  # EKS has no system/user modes: node groups listed here are kept at >= 1 node
+  systemNodepools: ["system"]
+  # Managed node groups left to the cluster autoscaler (never scaled by hand)
+  autoscaledNodepools: []
+  # Role ARN printed by deploy/setup-aws-irsa.sh
+  roleArn: arn:aws:iam::123456789012:role/kube-siesta-my-cluster
+  # Run on a node group listed in systemNodepools. This label exists on managed node groups only;
+  # use your own label for self-managed ones.
+  nodeSelector:
+    eks.amazonaws.com/nodegroup: system
+  tolerations: []
+  storageClassName: gp3
+
+# === Deployed by ======================================================================================
+# Plain manifests (kubectl apply, Kustomize, CI): leave flux and argocd disabled. Nothing then reverts a
+# scale-down, but re-applying a namespace's manifests while it sleeps brings its replicas back.
+
+# --- Flux ---------------------------------------------------------------------------------------------
+# Suspend the namespace's labelled Kustomizations and its HelmReleases while it sleeps. The Flux namespace
+# is then always protected. Label each Kustomization <SIESTA_LABEL_PREFIX>/namespace=<ns> (README, "Flux").
+flux:
+  enabled: false
+  namespace: flux-system
+  # Refuse to sleep a namespace that has no labelled Kustomization
+  requireIsolation: true
+
+# --- Argo CD ------------------------------------------------------------------------------------------
+# Turn off automated sync on the namespace's labelled Applications while it sleeps. The Argo CD namespace
+# is then always protected. Label each Application <SIESTA_LABEL_PREFIX>/namespace=<ns>; apps from an
+# ApplicationSet or a parent app need the parent to ignore spec.syncPolicy (README, "Argo CD").
+argocd:
+  enabled: false
+  namespace: argocd
+  # Refuse to sleep a namespace that has no labelled Application
+  requireIsolation: true
+
+# === Optional =========================================================================================
+
+# --- KEDA ---------------------------------------------------------------------------------------------
+# Pause ScaledObjects/ScaledJobs while their namespace sleeps.
+keda:
+  enabled: false
+
+# === App settings =====================================================================================
+# Each key becomes a SIESTA_* entry in the ConfigMap (lists and maps as JSON); see app/config.py. The cloud
+# and Flux/Argo CD/KEDA settings come from the sections above.
+config:
+  SIESTA_MANAGED_NAMESPACES: ["dev*"]
+  SIESTA_PROTECTED_NAMESPACES: ["kube-*", "default", "kube-siesta"]
+  SIESTA_PROTECTED_NODEPOOLS: []
+  # Node count per pool in off hours, e.g. {"systempool": 1}. User pools not listed go to 0; system pools
+  # not listed are left alone.
+  SIESTA_WEEKEND_NODE_COUNTS: {}
+  SIESTA_DEFAULT_WAKE_NODE_COUNT: 1
+  SIESTA_TIMEZONE: UTC
+  SIESTA_WEEKEND_START_DAY: fri
+  SIESTA_WEEKEND_START_TIME: "21:00"
+  SIESTA_WEEKEND_END_DAY: mon
+  SIESTA_WEEKEND_END_TIME: "07:00"
+  SIESTA_NIGHTLY_ENABLED: false
+  SIESTA_NIGHTLY_START_TIME: "21:00"
+  SIESTA_NIGHTLY_END_TIME: "07:00"
+  SIESTA_LEASE_HOURS: 8
+  SIESTA_STATE_DB_PATH: /data/kube-siesta.db
+  SIESTA_SCHEDULE_INTERVAL_SECONDS: 300
+  # Prefix of the labels/annotations the app writes (<prefix>/original-replicas, /suspended, /namespace).
+  # Use a domain you own; wake every namespace before changing it.
+  SIESTA_LABEL_PREFIX: kube-siesta.example.com
+
+# === Kubernetes ========================================================================================
+
+# SQLite state (ReadWriteOnce): the chart always runs a single replica with strategy Recreate.
+persistence:
+  # Empty uses the cloud section's storageClassName
+  storageClassName: ""
+  size: 1Gi
+
+serviceAccount:
+  # Added to the cloud identity annotation
+  annotations: {}
+
+podLabels: {}
+# Non-empty values replace the cloud section's nodeSelector / tolerations
+nodeSelector: {}
+tolerations: []
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    memory: 256Mi
+
+service:
+  port: 80
+
+# The app has no login: keep the ingress reachable only from your VPN/VPC, e.g. with
+# nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8"
+ingress:
+  enabled: false
+  className: nginx
+  annotations: {}
+  host: kube-siesta.example.com
+  tlsSecretName: ""

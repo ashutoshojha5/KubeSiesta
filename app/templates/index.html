@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block scripts %}<script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js"></script>{% endblock %}
+{% block body %}
+<body hx-headers='{"X-Requested-With": "htmx"}'>
+<header>
+  <h1>KubeSiesta · {{ settings.cluster_name }}</h1>
+  <form class="inline" method="post" action="/forget-name">
+    <span class="muted">Signed in as</span> <b>{{ user }}</b>
+    <span class="muted">·</span> <button type="submit" class="link">Change name</button>
+    <span class="muted">·</span> <a href="/config">Configuration</a>
+  </form>
+</header>
+<main>
+  {% if off_window_ends_at %}
+  <div class="banner">Off-hours mode is on until {{ off_window_ends_at.strftime('%a %H:%M') }}.
+    Namespaces you wake stay up for {{ settings.lease_hours }}h, then go back to sleep unless you extend them.</div>
+  {% endif %}
+  <div id="flash" aria-live="polite"></div>
+
+  <section>
+    <h2>Node pools</h2>
+    <div hx-get="/partials/nodepools" hx-trigger="load, every 15s, refresh from:body">Loading…</div>
+  </section>
+
+  <section>
+    <h2>Namespaces
+      <button hx-get="/partials/namespaces" hx-target="#namespaces" hx-include="[name=show_all]">Refresh</button>
+      <label class="muted"><input type="checkbox" name="show_all" value="true"
+        hx-get="/partials/namespaces" hx-target="#namespaces" hx-trigger="change"> show all namespaces</label>
+    </h2>
+    <div id="namespaces" hx-get="/partials/namespaces" hx-trigger="load, refresh from:body"
+         hx-include="[name=show_all]">Loading…</div>
+  </section>
+
+  <section>
+    <h2>Activity</h2>
+    <div hx-get="/partials/activity" hx-trigger="load, every 5s, refresh from:body">Loading…</div>
+  </section>
+</main>
+<script>
+  // Show request errors (e.g. "Set your name first") in the flash area
+  document.body.addEventListener("htmx:responseError", e => {
+    let msg = e.detail.xhr.responseText;
+    try { msg = JSON.parse(msg).detail; } catch (_) {}
+    document.getElementById("flash").innerHTML = "";
+    const div = document.createElement("div");
+    div.className = "banner"; div.textContent = "Error: " + msg;
+    document.getElementById("flash").appendChild(div);
+  });
+</script>
+</body>
+{% endblock %}

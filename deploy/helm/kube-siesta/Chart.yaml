@@ -1,0 +1,8 @@
+apiVersion: v2
+name: kube-siesta
+description: Off-hours scale-down and on-demand wake-up of AKS/EKS node pools and namespaces (Flux, Argo CD and KEDA aware)
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+annotations:
+  artifacthub.io/license: MIT
